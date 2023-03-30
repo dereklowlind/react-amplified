@@ -1,5 +1,5 @@
 /* src/App.js */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Amplify, API, graphqlOperation } from "aws-amplify";
 import { createTodo, updateTodo } from "./graphql/mutations";
 import { listTodos } from "./graphql/queries";
@@ -15,10 +15,19 @@ const initialState = { name: "", description: "", category: "" };
 const App = () => {
   const [formState, setFormState] = useState(initialState);
   const [todos, setTodos] = useState([]);
-  const [filteredTodos, setFilteredTodos] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [finishedFilter, setFinishedFilter] = useState("all");
-  const [possibleCategories, setPossibleCategories] = useState({});
+
+  const possibleCategories = useMemo(() => {
+    let possibleCategories = {"all":true};
+      todos.forEach((t) => {
+        if (t.category) {
+          possibleCategories[t.category] = true;
+        }
+      });
+      console.log("🚀 ~ file: App.js:78 ~ possibleCategories ~ possibleCategories:", possibleCategories);
+      return possibleCategories;
+  }, [todos]);
 
   useEffect(() => {
     fetchTodos();
@@ -34,10 +43,12 @@ const App = () => {
 
     const updateSubscription = API.graphql(graphqlOperation(onUpdateTodo)).subscribe((msg) => {
       const updatedTodo = msg.value.data.onUpdateTodo;
-      // console.log("🚀 ~ file: App.js:38 ~ updateSubscription ~ updatedTodo:", updatedTodo);
+      console.log("🚀 ~ file: App.js:38 ~ updateSubscription ~ updatedTodo:", updatedTodo);
       for(let i = 0; i<todos.length; i++){
-        if(todos[i].id === updatedTodo.id){
+        if(todos[i].id == updatedTodo.id){
           todos[i] = updatedTodo;
+          console.log("🚀 ~ file: App.js:52 ~ updateSubscription ~ todos:", todos)
+          console.log("🚀 ~ file: App.js:41 ~ updateSubscription ~ updatedTodo:", updatedTodo)
           setTodos([...todos]);
         }
       }
@@ -48,15 +59,9 @@ const App = () => {
       updateSubscription.unsubscribe();
     }
   }, []); 
-  // useEffect(() => {
-  //   const subscription = DataStore.observe(Todo).subscribe((msg) => {
-  //     console.log(msg.model, msg.opType, msg.element);
-  //   });
 
-  //   return () => subscription.unsubscribe();
-  // }, []);
 
-  useEffect(() => {
+  const filteredTodos = useMemo(() => {
     let filtered = todos;
     if (categoryFilter !== "all") {
       filtered = filtered.filter((todo) => {
@@ -70,7 +75,7 @@ const App = () => {
         return todo.finished === finishedbool;
       });
     }
-    setFilteredTodos(filtered);
+    return filtered;
   }, [todos, categoryFilter, finishedFilter]);
 
   function setInput(key, value) {
@@ -81,13 +86,6 @@ const App = () => {
     try {
       const todoData = await API.graphql(graphqlOperation(listTodos));
       const todos = todoData.data.listTodos.items;
-      let possibleCategories = {"all":true};
-      todos.forEach((t) => {
-        if (t.category) {
-          possibleCategories[t.category] = true;
-        }
-      });
-      setPossibleCategories(possibleCategories);
       console.log("🚀 ~ file: App.js:28 ~ fetchTodos ~ todos:", todos);
       setTodos(todos);
     } catch (err) {
